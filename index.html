@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Busskoll</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#12141b">
+<style>
+  :root {
+    --bg: #f4f5f8;
+    --card: #ffffff;
+    --text: #1c1f2a;
+    --muted: #666b7a;
+    --line: #dde0e8;
+    --red: #c62f3c;
+    --yellow: #b8860b;
+    --ok: #2e7d4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141b;
+      --card: #1c1f29;
+      --text: #e9eaf0;
+      --muted: #9a9fb0;
+      --line: #303442;
+      --red: #ef6b75;
+      --yellow: #f0c04a;
+      --ok: #6cc795;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 18px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 520px; margin: 0 auto; padding: 14px 16px 16px;
+    min-height: 100%; display: flex; flex-direction: column; gap: 10px;
+  }
+  .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .top h1 { font-size: 1.1rem; margin: 0; color: var(--muted); font-weight: 600; text-transform: capitalize; }
+  .top button {
+    font: inherit; font-size: 0.9rem; color: var(--muted);
+    background: none; border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 12px; cursor: pointer;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 18px; padding: 12px 16px;
+  }
+  .label { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+
+  /* Väder */
+  .now { display: flex; align-items: center; gap: 14px; }
+  .icon { font-size: 3.2rem; line-height: 1; }
+  .temp { font-size: 3.4rem; font-weight: 700; line-height: 1; letter-spacing: -2px; }
+  .desc { font-size: 1.05rem; margin-top: 4px; }
+  .facts { display: flex; justify-content: space-between; margin-top: 10px; gap: 8px; }
+  .fact { flex: 1; text-align: center; background: var(--bg); border-radius: 12px; padding: 5px 4px; }
+  .fact b { display: block; font-size: 1.2rem; }
+  .fact span { font-size: 0.75rem; color: var(--muted); }
+
+  /* Tunnelbana */
+  .linehead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    color: #fff; font-weight: 800; font-size: 1.2rem;
+    border-radius: 10px; padding: 1px 9px;
+  }
+  .linehead div { font-size: 0.9rem; color: var(--muted); }
+  .status { border-radius: 14px; padding: 10px 14px; font-weight: 700; font-size: 1.35rem; }
+  .status.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+  .status.warn { background: color-mix(in srgb, var(--yellow) 20%, transparent); color: var(--yellow); }
+  .status.bad { background: color-mix(in srgb, var(--red) 18%, transparent); color: var(--red); }
+  .msg { margin-top: 8px; font-size: 0.9rem; }
+  .msg b { display: block; }
+  .msg p { margin: 2px 0 0; color: var(--muted); max-height: 5.4em; overflow: hidden; }
+  .info { margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+  .deps { display: flex; gap: 8px; margin-top: 8px; }
+  .dep { flex: 1; text-align: center; background: var(--bg); border-radius: 12px; padding: 5px 4px; }
+  .dep b { display: block; font-size: 1.35rem; }
+  .dep span { font-size: 0.75rem; color: var(--muted); }
+  .dep.late span { color: var(--yellow); font-weight: 600; }
+  .dep.cancel b { text-decoration: line-through; color: var(--red); }
+  #linjer { display: flex; flex-direction: column; gap: 10px; }
+  .err { color: var(--red); font-size: 0.9rem; }
+  footer { margin-top: auto; font-size: 0.75rem; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1 id="dag"></h1>
+    <button id="uppdatera">Uppdatera</button>
+  </div>
+
+  <section class="card" id="vader">
+    <div class="label">Vädret i Svedmyra</div>
+    <div class="now">
+      <div class="icon" id="v-ikon">…</div>
+      <div>
+        <div class="temp" id="v-temp">–</div>
+        <div class="desc" id="v-text">Hämtar väder…</div>
+      </div>
+    </div>
+    <div class="facts">
+      <div class="fact"><b id="v-max">–</b><span>Max idag</span></div>
+      <div class="fact"><b id="v-min">–</b><span>Min idag</span></div>
+      <div class="fact"><b id="v-regn">–</b><span>Regnrisk</span></div>
+      <div class="fact"><b id="v-vind">–</b><span>Vind m/s</span></div>
+    </div>
+  </section>
+
+  <div id="linjer"></div>
+
+  <footer id="uppdaterad">Data från Open-Meteo och SL</footer>
+</main>
+
+<script>
+  // Inställningar: ändra här om du flyttar eller byter linje.
+  var PLATS = { lat: 59.2782, lon: 18.0690 };   // Svedmyra
+  // station = SL:s site-id, riktning = SL:s direction_code (1 eller 2),
+  // till = det som står i rubriken, slut = bussens slutstation enligt SL.
+  var LINJER = [
+    { linje: "161", farg: "#d71d24", station: 9165, riktning: 1, fran: "Svedmyra", till: "Majstångsvägen", slut: "Midsommarkransen" },
+    { linje: "163", farg: "#d71d24", station: 9165, riktning: 1, fran: "Svedmyra", till: "Fruängen", slut: "Bredäng" }
+  ];
+  var SEN_MIN = 3;             // räknas som försenad från så här många minuter
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function hhmm(d) { return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }); }
+
+  // WMO-väderkoder → ikon och svensk text.
+  function vadertyp(kod, dag) {
+    var sol = dag ? "☀️" : "🌙";
+    var T = {
+      0: [sol, "Klart"], 1: [dag ? "🌤️" : "🌙", "Mestadels klart"], 2: ["⛅", "Halvklart"], 3: ["☁️", "Mulet"],
+      45: ["🌫️", "Dimma"], 48: ["🌫️", "Dimma med rimfrost"],
+      51: ["🌦️", "Lätt duggregn"], 53: ["🌦️", "Duggregn"], 55: ["🌧️", "Kraftigt duggregn"],
+      56: ["🌧️", "Underkylt duggregn"], 57: ["🌧️", "Underkylt duggregn"],
+      61: ["🌦️", "Lätt regn"], 63: ["🌧️", "Regn"], 65: ["🌧️", "Kraftigt regn"],
+      66: ["🌧️", "Underkylt regn"], 67: ["🌧️", "Underkylt regn"],
+      71: ["🌨️", "Lätt snöfall"], 73: ["🌨️", "Snöfall"], 75: ["❄️", "Kraftigt snöfall"], 77: ["🌨️", "Snökorn"],
+      80: ["🌦️", "Regnskurar"], 81: ["🌧️", "Regnskurar"], 82: ["⛈️", "Kraftiga skurar"],
+      85: ["🌨️", "Snöbyar"], 86: ["❄️", "Kraftiga snöbyar"],
+      95: ["⛈️", "Åska"], 96: ["⛈️", "Åska med hagel"], 99: ["⛈️", "Åska med hagel"]
+    };
+    return T[kod] || ["🌡️", "Okänt väder"];
+  }
+
+  function hamtaVader() {
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + PLATS.lat + "&longitude=" + PLATS.lon +
+      "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+      "&wind_speed_unit=ms&timezone=Europe%2FStockholm&forecast_days=1&models=best_match";
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      var c = d.current, t = vadertyp(c.weather_code, c.is_day);
+      $("v-ikon").textContent = t[0];
+      $("v-temp").textContent = Math.round(c.temperature_2m) + "°";
+      $("v-text").textContent = t[1] + ", känns som " + Math.round(c.apparent_temperature) + "°";
+      $("v-max").textContent = Math.round(d.daily.temperature_2m_max[0]) + "°";
+      $("v-min").textContent = Math.round(d.daily.temperature_2m_min[0]) + "°";
+      $("v-regn").textContent = d.daily.precipitation_probability_max[0] + "%";
+      $("v-vind").textContent = Math.round(c.wind_speed_10m);
+    }).catch(function () {
+      $("v-text").innerHTML = '<span class="err">Kunde inte hämta vädret</span>';
+    });
+  }
+
+  // Gäller störningen SL-bussen på linjen? (Andra trafikslag kan ha samma linjenummer.)
+  function galler(m, linje) {
+    return (m.scope && m.scope.lines || []).some(function (l) {
+      return l.designation === linje && l.transport_mode === "BUS";
+    });
+  }
+
+  // Ritar ett tomt kort per linje; korten fylls i av hamtaLinje.
+  function ritaKort() {
+    $("linjer").innerHTML = LINJER.map(function (L, i) {
+      return '<section class="card">' +
+        '<div class="linehead"><span class="badge" style="background:' + L.farg + '">' + L.linje + '</span>' +
+        '<div>' + esc(L.fran) + ' → ' + esc(L.till) + '</div></div>' +
+        '<div class="status" id="t-status-' + i + '">Hämtar…</div>' +
+        '<div id="t-msg-' + i + '"></div>' +
+        '<div class="deps" id="t-deps-' + i + '"></div></section>';
+    }).join("");
+  }
+
+  function hamtaLinje(L, i) {
+    var stor = fetch("https://deviations.integration.sl.se/v1/messages?future=false&transport_mode=BUS&line=" + L.linje)
+      .then(function (r) { if (!r.ok) throw new Error(); return r.json(); });
+    // SL:s API svarar ibland med en tom lista fast tågen går; fråga då igen några gånger.
+    function hamtaAvg(forsok) {
+      return fetch("https://transport.integration.sl.se/v1/sites/" + L.station + "/departures?transport=BUS&line=" + L.linje + "&forecast=60&f=" + Date.now())
+        .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+        .then(function (d) {
+          if ((d.departures || []).length || forsok >= 3) return d;
+          return new Promise(function (ok) { setTimeout(ok, 700); }).then(function () { return hamtaAvg(forsok + 1); });
+        });
+    }
+    var avg = hamtaAvg(1);
+
+    return Promise.all([stor, avg]).then(function (res) {
+      var nu = Date.now();
+      var meddelanden = res[0].filter(function (m) { return galler(m, L.linje); }).filter(function (m) {
+        var p = m.publish || {};
+        return (!p.from || Date.parse(p.from) <= nu) && (!p.upto || Date.parse(p.upto) >= nu);
+      });
+      var avgangar = (res[1].departures || []).filter(function (a) {
+        return a.direction_code === L.riktning && a.line && String(a.line.designation) === L.linje;
+      });
+
+      // Störningar: viktighet 5+ = rött, 3–4 = gult, lägre (t.ex. stängd entré) = bara info.
+      var allvarliga = meddelanden.filter(function (m) { return m.priority.importance_level >= 3; });
+      var ovriga = meddelanden.filter(function (m) { return m.priority.importance_level < 3; });
+      var rod = allvarliga.some(function (m) { return m.priority.importance_level >= 5; });
+
+      var forsening = 0, installda = 0;
+      avgangar.slice(0, 4).forEach(function (a) {
+        if (a.state === "CANCELLED") installda++;
+        if (a.scheduled && a.expected) {
+          var min = Math.round((Date.parse(a.expected) - Date.parse(a.scheduled)) / 60000);
+          if (min > forsening) forsening = min;
+        }
+      });
+      if (installda) rod = true;
+
+      var s = $("t-status-" + i);
+      if (rod) { s.className = "status bad"; }
+      else if (allvarliga.length || forsening >= SEN_MIN) { s.className = "status warn"; }
+      else { s.className = "status ok"; }
+
+      if (allvarliga.length) s.textContent = "⚠ Störning";
+      else if (installda) s.textContent = "✖ Inställda avgångar";
+      else if (forsening >= SEN_MIN) s.textContent = "⏱ Förseningar, upp till " + forsening + " min";
+      else s.textContent = "✓ Inga störningar";
+
+      var html = allvarliga.map(function (m) {
+        var v = m.message_variants[0];
+        return '<div class="msg"><b>' + esc(v.header) + '</b><p>' + esc(v.details) + '</p></div>';
+      }).join("");
+      if (ovriga.length) {
+        html += '<div class="info">Info: ' + ovriga.map(function (m) { return esc(m.message_variants[0].header); }).join(" · ") + '</div>';
+      }
+      $("t-msg-" + i).innerHTML = html;
+
+      // Bussar som vänder tidigare visar slutstationen i stället för klockslag.
+      // Fick vi ändå inga avgångar behålls de förra, så att ett tillfälligt tomt svar inte syns.
+      if (!avgangar.length && $("t-deps-" + i).querySelector(".dep")) return;
+      $("t-deps-" + i).innerHTML = avgangar.slice(0, 3).map(function (a) {
+        var tid = new Date(a.expected || a.scheduled);
+        var sen = a.scheduled && a.expected ? Math.round((Date.parse(a.expected) - Date.parse(a.scheduled)) / 60000) : 0;
+        var cls = a.state === "CANCELLED" ? "dep cancel" : (sen >= SEN_MIN ? "dep late" : "dep");
+        var under = a.state === "CANCELLED" ? "Inställd" : (sen >= SEN_MIN ? "+" + sen + " min" :
+          (a.destination && a.destination !== L.slut ? "till " + esc(a.destination) :
+          // Visar SL redan ett klockslag skrivs i stället hur länge det är kvar.
+          (String(a.display).indexOf(":") >= 0 ? "om " + Math.max(0, Math.round((tid - Date.now()) / 60000)) + " min" : hhmm(tid))));
+        return '<div class="' + cls + '"><b>' + esc(a.display) + '</b><span>' + under + '</span></div>';
+      }).join("") || '<div class="info">Inga avgångar närmaste timmen</div>';
+    }).catch(function () {
+      var s = $("t-status-" + i);
+      s.className = "status warn";
+      s.textContent = "Kunde inte hämta SL-data";
+    });
+  }
+
+  function uppdatera() {
+    var nu = new Date();
+    $("dag").textContent = nu.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
+    Promise.all([hamtaVader()].concat(LINJER.map(hamtaLinje))).then(function () {
+      $("uppdaterad").textContent = "Uppdaterad " + hhmm(new Date()) + " · Data från Open-Meteo och SL";
+    });
+  }
+
+  $("uppdatera").addEventListener("click", uppdatera);
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) uppdatera(); });
+  setInterval(function () { if (!document.hidden) uppdatera(); }, 60000);
+  ritaKort();
+  uppdatera();
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
